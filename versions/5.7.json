@@ -1,0 +1,22 @@
+{
+  "branch": "5.7",
+  "engineVersion": {
+    "major": 5,
+    "minor": 7,
+    "patch": 4,
+    "branchName": "UE5"
+  },
+  "android": {
+    "ndk": "27.2.12479018",
+    "platform": "android-34",
+    "buildTools": "35.0.1",
+    "cmake": "3.22.1",
+    "cmdlineTools": "11076708"
+  },
+  "linux": {
+    "toolchain": "v26_clang-20.1.8-rockylinux8"
+  },
+  "dotnet": "8.0.412",
+  "java": "17",
+  "baseImage": "ubuntu:22.04"
+}

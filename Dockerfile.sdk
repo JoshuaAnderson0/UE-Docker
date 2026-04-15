@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1.7
+# =============================================================================
+# UE Build SDK - Final Image
+# Contains a pre-compiled Installed Build of Unreal Engine for building
+# game projects targeting Linux Server and Android Client.
+# =============================================================================
+ARG BASE_IMAGE=ubuntu:22.04
+ARG BUILDER_IMAGE=ue-builder:5.7
+FROM ${BUILDER_IMAGE} AS android-source
+
+FROM ${BASE_IMAGE}
+
+ARG JAVA_VERSION=17
+ARG ANDROID_NDK_VERSION=27.2.12479018
+ARG UE_VERSION=5.7
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Runtime + compilation dependencies ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        git-lfs \
+        libc6-dev \
+        libfreetype6 \
+        libglu1-mesa \
+        libnss3 \
+        libssl3 \
+        pkg-config \
+        python3 \
+        shared-mime-info \
+        sudo \
+        tzdata \
+        unzip \
+        xdg-user-dirs \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- OpenJDK (for Android builds) ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-${JAVA_VERSION}-jdk-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Non-root user ---
+RUN groupadd -g 1000 ue && \
+    useradd -u 1000 -g ue -m -s /bin/bash ue && \
+    echo "ue ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# --- Android SDK/NDK (copied from builder, no re-download) ---
+ENV ANDROID_HOME=/opt/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64
+ENV NDK_ROOT=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}
+ENV NDKROOT=${NDK_ROOT}
+ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${NDK_ROOT}:${JAVA_HOME}/bin:${PATH}"
+
+COPY --from=android-source --chown=ue:ue /opt/android-sdk /opt/android-sdk
+
+# --- Copy Installed Build output from build context ---
+ENV UE_ROOT=/home/ue/UnrealEngine
+COPY --chown=ue:ue Linux/ ${UE_ROOT}/
+
+# --- Verify InstalledBuild marker exists ---
+RUN test -f ${UE_ROOT}/Engine/Build/InstalledBuild.txt || \
+    (echo "ERROR: InstalledBuild.txt not found — this is not a valid Installed Build" && exit 1)
+
+# --- Labels ---
+LABEL org.opencontainers.image.title="Unreal Engine ${UE_VERSION} Build SDK" \
+      org.opencontainers.image.description="Pre-built UE ${UE_VERSION} for Linux Server + Android Client builds" \
+      ue.version="${UE_VERSION}" \
+      ue.platforms="Linux,Android" \
+      ue.targets="Server,Client"
+
+USER ue
+WORKDIR /home/ue
